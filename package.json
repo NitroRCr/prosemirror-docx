@@ -1,9 +1,9 @@
 {
-  "name": "prosemirror-docx",
-  "version": "0.6.1",
+  "name": "@krytro/prosemirror-docx",
+  "version": "0.7.0",
   "type": "module",
   "description": "Export from a prosemirror document to Microsoft word",
-  "author": "Rowan Cockett <rowan@curvenote.com>",
+  "author": "NitroRCr",
   "license": "MIT",
   "packageManager": "yarn@1.22.22",
   "main": "dist/cjs/index.js",
@@ -24,12 +24,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/curvenote/prosemirror-docx.git"
+    "url": "git+https://github.com/NitroRCr/prosemirror-docx.git"
   },
   "bugs": {
-    "url": "https://github.com/curvenote/prosemirror-docx/issues"
+    "url": "https://github.com/NitroRCr/prosemirror-docx/issues"
   },
-  "homepage": "https://github.com/curvenote/prosemirror-docx",
+  "homepage": "https://github.com/NitroRCr/prosemirror-docx",
   "scripts": {
     "clean": "rimraf dist",
     "build:cjs": "tsc --project ./src/tsconfig.json",

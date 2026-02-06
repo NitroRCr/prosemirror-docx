@@ -21,4 +21,4 @@ export {
   defaultNodes,
   defaultMarks,
 } from './schema';
-export { writeDocx, createDocFromState, buildDoc } from './utils';
+export { writeDocx, createDocFromState } from './utils';

@@ -18,19 +18,16 @@ import {
   TableRow,
   TableCell,
   ITableCellOptions,
-  InternalHyperlink,
-  SimpleField,
   FootnoteReferenceRun,
   IImageOptions,
   Document,
   ITableOptions,
   ITableRowOptions,
-  IPropertiesOptions,
 } from 'docx';
 import { imageDimensionsFromData } from 'image-dimensions';
 import { createNumbering, NumberingStyles } from './numbering';
-import { buildDoc, createShortId } from './utils';
-import { IFootnotes, INumbering, Mutable, SectionConfig, SerializationState } from './types';
+import { createDocFromState, createShortId } from './utils';
+import { IFootnotes, INumbering, Mutable, SectionConfig } from './types';
 
 // This is duplicated from @curvenote/schema
 export type AlignOptions = 'left' | 'center' | 'right';
@@ -57,7 +54,6 @@ export type Options = {
 
 export type OptionsAsync = {
   getImageBuffer: (src: string) => Uint8Array | Promise<Uint8Array>;
-  sections?: SectionConfig[];
 };
 
 export type IMathOpts = {
@@ -92,13 +88,6 @@ export class DocxSerializerState {
 
   children: (Paragraph | Table)[];
 
-  sections: Array<{
-    config: SectionConfig;
-    children: (Paragraph | Table)[];
-  }>;
-
-  currentSectionIndex = 0;
-
   numbering: INumbering[];
 
   footnotes: IFootnotes = {};
@@ -120,17 +109,6 @@ export class DocxSerializerState {
     this.options = options ?? {};
     this.children = [];
     this.numbering = [];
-
-    // Initialize sections
-    if (options.sections && options.sections.length > 0) {
-      this.sections = options.sections.map((config) => ({
-        config,
-        children: [],
-      }));
-      this.children = this.sections[0].children;
-    } else {
-      this.sections = [];
-    }
   }
 
   renderContent(parent: Node, opts?: IParagraphOptions) {
@@ -405,73 +383,6 @@ export class DocxSerializerState {
     delete this.nextParentParagraphOpts;
     this.children.push(paragraph);
   }
-
-  /**
-   * Move to the next section. If no more sections are available,
-   * this will be ignored (content continues in current section).
-   */
-  nextSection() {
-    if (this.currentSectionIndex < this.sections.length - 1) {
-      this.currentSectionIndex += 1;
-      this.children = this.sections[this.currentSectionIndex].children;
-    }
-  }
-
-  /**
-   * Update the current section's configuration
-   */
-  setSectionConfig(config: Partial<SectionConfig>) {
-    this.sections[this.currentSectionIndex].config = {
-      ...this.sections[this.currentSectionIndex].config,
-      ...config,
-    };
-  }
-
-  /**
-   * Add a new section with the given configuration and switch to it
-   */
-  addSection(config: SectionConfig = {}) {
-    this.sections.push({
-      config,
-      children: [],
-    });
-    this.currentSectionIndex = this.sections.length - 1;
-    this.children = this.sections[this.currentSectionIndex].children;
-  }
-
-  /**
-   * Get the current section index
-   */
-  getCurrentSectionIndex(): number {
-    return this.currentSectionIndex;
-  }
-
-  /**
-   * Get the current section configuration
-   */
-  getCurrentSectionConfig(): SectionConfig {
-    return this.sections[this.currentSectionIndex].config;
-  }
-
-  /**
-   * Get the current serialization state for document creation
-   */
-  getSerializationState(): SerializationState {
-    return {
-      numbering: this.numbering,
-      sections: this.sections,
-      footnotes: this.footnotes,
-    };
-  }
-
-  createReference(id: string, before?: string, after?: string) {
-    const children: ParagraphChild[] = [];
-    if (before) children.push(new TextRun(before));
-    children.push(new SimpleField(`REF ${id} \\h`));
-    if (after) children.push(new TextRun(after));
-    const ref = new InternalHyperlink({ anchor: id, children });
-    this.current.push(ref);
-  }
 }
 
 export class DocxSerializer {
@@ -484,14 +395,10 @@ export class DocxSerializer {
     this.marks = marks;
   }
 
-  serialize(
-    content: Node,
-    options: Options,
-    getDocumentOptions?: (state: SerializationState) => IPropertiesOptions,
-  ): Document {
+  serialize(content: Node, options: Options): Document {
     const state = new DocxSerializerState(this.nodes, this.marks, options);
     state.renderContent(content);
-    return buildDoc(state, getDocumentOptions?.(state));
+    return createDocFromState(state);
   }
 }
 
@@ -503,11 +410,6 @@ export class DocxSerializerStateAsync {
   marks: MarkSerializer;
 
   children: (Paragraph | Table)[];
-
-  sections: Array<{
-    config: SectionConfig;
-    children: (Paragraph | Table)[];
-  }>;
 
   currentSectionIndex = 0;
 
@@ -532,17 +434,6 @@ export class DocxSerializerStateAsync {
     this.options = options ?? {};
     this.children = [];
     this.numbering = [];
-
-    // Initialize sections
-    if (options.sections && options.sections.length > 0) {
-      this.sections = options.sections.map((config) => ({
-        config,
-        children: [],
-      }));
-      this.children = this.sections[0].children;
-    } else {
-      this.sections = [];
-    }
   }
 
   async renderContent(parent: Node, opts?: IParagraphOptions) {
@@ -834,73 +725,6 @@ export class DocxSerializerStateAsync {
     delete this.nextParentParagraphOpts;
     this.children.push(paragraph);
   }
-
-  /**
-   * Move to the next section. If no more sections are available,
-   * this will be ignored (content continues in current section).
-   */
-  nextSection() {
-    if (this.currentSectionIndex < this.sections.length - 1) {
-      this.currentSectionIndex += 1;
-      this.children = this.sections[this.currentSectionIndex].children;
-    }
-  }
-
-  /**
-   * Update the current section's configuration
-   */
-  setSectionConfig(config: Partial<SectionConfig>) {
-    this.sections[this.currentSectionIndex].config = {
-      ...this.sections[this.currentSectionIndex].config,
-      ...config,
-    };
-  }
-
-  /**
-   * Add a new section with the given configuration and switch to it
-   */
-  addSection(config: SectionConfig = {}) {
-    this.sections.push({
-      config,
-      children: [],
-    });
-    this.currentSectionIndex = this.sections.length - 1;
-    this.children = this.sections[this.currentSectionIndex].children;
-  }
-
-  /**
-   * Get the current section index
-   */
-  getCurrentSectionIndex(): number {
-    return this.currentSectionIndex;
-  }
-
-  /**
-   * Get the current section configuration
-   */
-  getCurrentSectionConfig(): SectionConfig {
-    return this.sections[this.currentSectionIndex].config;
-  }
-
-  /**
-   * Get the current serialization state for document creation
-   */
-  getSerializationState(): SerializationState {
-    return {
-      numbering: this.numbering,
-      sections: this.sections,
-      footnotes: this.footnotes,
-    };
-  }
-
-  createReference(id: string, before?: string, after?: string) {
-    const children: ParagraphChild[] = [];
-    if (before) children.push(new TextRun(before));
-    children.push(new SimpleField(`REF ${id} \\h`));
-    if (after) children.push(new TextRun(after));
-    const ref = new InternalHyperlink({ anchor: id, children });
-    this.current.push(ref);
-  }
 }
 
 export class DocxSerializerAsync {
@@ -913,13 +737,9 @@ export class DocxSerializerAsync {
     this.marks = marks;
   }
 
-  async serializeAsync(
-    content: Node,
-    options: OptionsAsync,
-    getDocumentOptions?: (state: SerializationState) => IPropertiesOptions,
-  ) {
+  async serializeAsync(content: Node, options: OptionsAsync) {
     const state = new DocxSerializerStateAsync(this.nodes, this.marks, options);
     await state.renderContent(content);
-    return buildDoc(state, getDocumentOptions?.(state));
+    return createDocFromState(state);
   }
 }
